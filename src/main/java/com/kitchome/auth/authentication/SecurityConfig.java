@@ -26,6 +26,20 @@ import org.springframework.security.web.SecurityFilterChain;
  * which is not a good practice at all. we will
  * correct all of this as we move further
  * */
+
+/*
+ * here we are using basic auth which is very vulnerable
+ * as it sends data over the network for each request in
+ * username:password format, inspect it and 
+ * check the request header in response tab*/
+
+/*this is sent over network for 
+ * authorisation, Basic c2FtOmNvbW1vbg==*/
+
+/*we have configured our securityconfig
+ * ro secure all api on thia domAIN 
+ * EXCEPT PROVIDED URLS*/
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -33,8 +47,9 @@ public class SecurityConfig {
 	public SecurityFilterChain securityHttpConfig(HttpSecurity http) throws Exception {
 		return http
 				.authorizeHttpRequests(
-						authz -> authz.requestMatchers("/api/v1/private").authenticated().anyRequest().permitAll())
-				.formLogin(Customizer.withDefaults())
+						authz -> authz.requestMatchers("/api/v1/public").permitAll().anyRequest().authenticated())
+				.httpBasic(Customizer.withDefaults())
+				//.formLogin(Customizer.withDefaults())
 
 				.build();
 
