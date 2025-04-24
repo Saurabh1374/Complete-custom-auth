@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Welcome Page</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(#f9f7f6, #ffeefc);
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        h1 {
+            text-align: center;
+            color: #cc3366;
+            margin-top: 15%;
+            font-size: 3rem;
+            z-index: 1;
+            position: relative;
+        }
+
+        .petal {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            background-image: url('https://cdn-icons-png.flaticon.com/512/765/765013.png');
+            background-size: cover;
+            animation: fall linear infinite;
+            z-index: 0;
+        }
+
+        @keyframes fall {
+            0% {
+                transform: translateY(-100px) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(110vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        .buttons-container {
+            text-align: center;
+            margin-top: 5%;
+        }
+
+        .button {
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            background-color: #cc3366;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin: 10px;
+            transition: background-color 0.3s;
+        }
+
+        .button:hover {
+            background-color: #ff6699;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Welcome to Security!</h1>
+
+<!-- Buttons for login and register -->
+<div class="buttons-container">
+    <a th:href="${loginLink}" class="button">Login</a>
+    <a th:href="${registerLink}" class="button">Register</a>
+</div>
+
+<script>
+    const numPetals = 25;
+
+    for (let i = 0; i < numPetals; i++) {
+        const petal = document.createElement('div');
+        petal.className = 'petal';
+        petal.style.left = `${Math.random() * 100}vw`;
+        petal.style.animationDuration = `${5 + Math.random() * 5}s`;
+        petal.style.animationDelay = `${Math.random() * 5}s`;
+        document.body.appendChild(petal);
+    }
+</script>
+
+</body>
+</html>
