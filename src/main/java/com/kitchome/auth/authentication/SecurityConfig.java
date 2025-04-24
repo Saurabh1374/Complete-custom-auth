@@ -4,16 +4,9 @@ package com.kitchome.auth.authentication;
  * Date: 3-03-2025
  * */
 
-import com.kitchome.auth.filters.*;
-import com.kitchome.auth.util.JwtUtil;
-import jakarta.servlet.DispatcherType;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.repository.cdi.Eager;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -21,9 +14,6 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.session.SessionRegistry;
-import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -31,15 +21,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.access.AccessDeniedHandler;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
-import org.springframework.security.web.session.HttpSessionEventPublisher;
-import org.springframework.security.web.session.SessionInformationExpiredStrategy;
 
-
+// in the given code we are using form login which is 
+// stateful by default it will store a jsession id
+// check that in the browser cookies
 /*
  * here we are configuring spring security to
  * secure just the "/private" rest api
@@ -48,96 +34,43 @@ import org.springframework.security.web.session.SessionInformationExpiredStrateg
  * */
 
 /*
- * here we are implementing
- * cocurrent session control
- * so that a user can have only ne active session
- */
+ * here we are using basic auth which is very vulnerable
+ * as it sends data over the network for each request in
+ * username:password format, inspect it and 
+ * check the request header in response tab*/
 
-/*form login is enabled
-user credentials are obtained through
-post req from login page.
- */
+/*this is sent over network for 
+ * authorisation, Basic c2FtOmNvbW1vbg==*/
 
-/*
-* we are going to implement jwt
-* and make authentication stateless
-* implementation of concurrent session
-* will be change as well as logout logic will
-* also  be changed as things are not session based now
-*/
+/*we have configured our securityconfig
+ * ro secure all api on thia domAIN 
+ * EXCEPT PROVIDED URLS*/
 
 @Configuration
-@RequiredArgsConstructor
 @EnableWebSecurity
 public class SecurityConfig {
-	 private final UserDetailsService userDetailsService;
-	private final JwtUtil jwtUtil;
-	private final AccessDeniedHandler customAccessDeniedHandler;
-	private final AuthenticationEntryPoint authenticationEntryPoint;
-	private final PasswordEncoder passwordEncoder;
+	 @Autowired
+	    private UserDetailsService userDetailsService; 
 	@Bean
 	public SecurityFilterChain securityHttpConfig(HttpSecurity http) throws Exception {
-		 http
-				.requiresChannel(rcc -> rcc.anyRequest().requiresInsecure())
-				 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+		return http
 				.authorizeHttpRequests(
-						authz -> authz
-								.requestMatchers("/api/v1/public","/api/v1/users/register","/","/static/**","/error",
-										"/api/v1/users/login","/api/v1/users/refresh","/invalidSession","/login").permitAll()
+						authz -> authz.
+						requestMatchers("/api/v1/public","/api/v1/users/register","/","/static/**").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/users/register").permitAll()
-								.requestMatchers(HttpMethod.POST, "/api/v1/users/refresh").permitAll()
 						.anyRequest().authenticated())
-				.csrf(csrf -> csrf.disable())
-				 .cors(Customizer.withDefaults())
-				 .addFilterBefore(new RequestValidationBeforeFilter(), BasicAuthenticationFilter.class)
-				 .addFilterAfter(new AuthoritiesLoggingAfterFilter(), BasicAuthenticationFilter.class)
-				 .addFilterAt(new AuthoritiesLoggingAtFilter(), BasicAuthenticationFilter.class)
-				 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil,userDetailsService,authenticationEntryPoint), UsernamePasswordAuthenticationFilter.class)
-				 .addFilterAfter(new AlreadyLoggedInFilter(),JwtAuthenticationFilter.class)
-				 .exceptionHandling(ex -> ex
-						 .accessDeniedHandler(customAccessDeniedHandler)
-						 .authenticationEntryPoint(authenticationEntryPoint)// 403
-				 );
-		 return http.build();
+				.csrf(csrf -> csrf.disable()) 
+				.httpBasic(Customizer.withDefaults())
 				//.formLogin(Customizer.withDefaults())
-	}
-	/*
-	* this bean keeps track
-	* of session creation and
-	* expiration.
-	*
-	* */
-	@Bean
-	public static HttpSessionEventPublisher httpSessionEventPublisher() {
-		return new HttpSessionEventPublisher();
-	}
-	@Bean
-	public SessionInformationExpiredStrategy sessionInformationExpiredStrategy() {
-		return event -> {
-			HttpServletResponse response = event.getResponse();
-			response.sendRedirect("/api/v1/users/login?session=maxed");
-		};
-	}
 
-	/*
-	* keeps track of active session
-	* creates a new session if not available
-	* in-memory.
-	* */
-	@Bean
-	public SessionRegistry sessionRegistry() {
-		return new SessionRegistryImpl();
+				.build();
+
 	}
-/*
-* default authentication provider used
-* by spring security.
-*
-* */
-	@Bean
+	 @Bean
 	    public DaoAuthenticationProvider authenticationProvider() {
 	        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
 	        provider.setUserDetailsService(userDetailsService);
-	        provider.setPasswordEncoder(passwordEncoder);
+	        provider.setPasswordEncoder(pass());
 	        return provider;
 	    }
 
@@ -161,6 +94,9 @@ public class SecurityConfig {
 	 * it is reccomended to use password encoder factory it provides backward
 	 * compatiblity
 	 */
-
+	@Bean
+	public PasswordEncoder pass() {
+		return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+	}
 
 }
