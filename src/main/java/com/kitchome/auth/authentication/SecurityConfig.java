@@ -4,15 +4,21 @@ package com.kitchome.auth.authentication;
  * Date: 3-03-2025
  * */
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
@@ -43,35 +49,54 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+	 @Autowired
+	    private UserDetailsService userDetailsService; 
 	@Bean
 	public SecurityFilterChain securityHttpConfig(HttpSecurity http) throws Exception {
 		return http
 				.authorizeHttpRequests(
-						authz -> authz.requestMatchers("/api/v1/public").permitAll().anyRequest().authenticated())
+						authz -> authz.
+						requestMatchers("/api/v1/public","/api/v1/users/register","/","/static/**").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/v1/users/register").permitAll()
+						.anyRequest().authenticated())
+				.csrf(csrf -> csrf.disable()) 
 				.httpBasic(Customizer.withDefaults())
 				//.formLogin(Customizer.withDefaults())
 
 				.build();
 
 	}
+	 @Bean
+	    public DaoAuthenticationProvider authenticationProvider() {
+	        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+	        provider.setUserDetailsService(userDetailsService);
+	        provider.setPasswordEncoder(pass());
+	        return provider;
+	    }
 
-	@Bean
-	public UserDetailsService userDetailsService() {
-
-		return new InMemoryUserDetailsManager(User.builder().username("sam")
-				// {noop} is telling security config not to delegate
-				// any password encode and store it in plain text
-				.password("{noop}common").authorities("ROLE_user").build());
-
-	}
+//	@Bean
+//	public UserDetailsService userDetailsService() {
+//
+//		return new InMemoryUserDetailsManager(User.builder().username("sam")
+//				// {noop} is telling security config not to delegate
+//				// any password encode and store it in plain text
+//				.password("{noop}common").authorities("ROLE_user").build());
+//
+//	}
+	 @Bean
+	    public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
+	        return http.getSharedObject(AuthenticationManagerBuilder.class)
+	                   .authenticationProvider(authenticationProvider())
+	                   .build();
+	    }
 
 	/*
 	 * it is reccomended to use password encoder factory it provides backward
 	 * compatiblity
 	 */
-//	@Bean
-//	public PasswordEncoder pass() {
-//		return new BCryptPasswordEncoder();
-//	}
+	@Bean
+	public PasswordEncoder pass() {
+		return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+	}
 
 }
