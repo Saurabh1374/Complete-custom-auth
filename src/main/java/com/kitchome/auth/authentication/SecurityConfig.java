@@ -53,17 +53,26 @@ public class SecurityConfig {
 	    private UserDetailsService userDetailsService; 
 	@Bean
 	public SecurityFilterChain securityHttpConfig(HttpSecurity http) throws Exception {
-		return http
+		 http
 				.authorizeHttpRequests(
 						authz -> authz.
 						requestMatchers("/api/v1/public","/api/v1/users/register","/","/static/**").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/users/register").permitAll()
 						.anyRequest().authenticated())
-				.csrf(csrf -> csrf.disable()) 
+				.csrf(csrf -> csrf.disable())
 				.httpBasic(Customizer.withDefaults())
+				.logout(logout -> logout
+					    .logoutUrl("/logout")
+					    .logoutSuccessUrl("/") // or "/"
+					    .invalidateHttpSession(true)
+					    .deleteCookies("JSESSIONID")
+					);
+		 return http.build();
+				
+
 				//.formLogin(Customizer.withDefaults())
 
-				.build();
+				
 
 	}
 	 @Bean
