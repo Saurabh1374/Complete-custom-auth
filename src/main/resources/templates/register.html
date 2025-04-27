@@ -61,6 +61,9 @@
     </style>
 </head>
 <body>
+<div th:if="${errorMessage}" class="alert alert-danger">
+    <p th:text="${errorMessage}"></p>
+</div>
 <div class="register-container">
     <h2>Register</h2>
     <form id="registerForm">
