@@ -1,5 +1,7 @@
 package com.kitchome.auth.payload;
 
+
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -8,7 +10,9 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 
+
 public class RegisterUserDTO {
+	
 	private String username;
     private String email;
     private String password;
