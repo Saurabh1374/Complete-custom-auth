@@ -4,6 +4,13 @@ package com.kitchome.auth.authentication;
  * Date: 3-03-2025
  * */
 
+import com.kitchome.auth.Exception.CustomAccessDeniedHandler;
+import com.kitchome.auth.Exception.CustomBasicAuthenticationEntryPoint;
+import com.kitchome.auth.events.CustomAuthenticationFailureHandler;
+import com.kitchome.auth.events.CustomAuthenticationSuccessHandler;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +21,8 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -22,6 +31,8 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
+import org.springframework.security.web.session.SessionInformationExpiredStrategy;
 
 // in the given code we are using form login which is 
 // stateful by default it will store a jsession id
@@ -34,48 +45,94 @@ import org.springframework.security.web.SecurityFilterChain;
  * */
 
 /*
- * here we are using basic auth which is very vulnerable
- * as it sends data over the network for each request in
- * username:password format, inspect it and 
- * check the request header in response tab*/
+ * here we are implementing
+ * cocurrent session control
+ * so that a user can have only ne active session
+ */
 
-/*this is sent over network for 
- * authorisation, Basic c2FtOmNvbW1vbg==*/
+/*form login is enabled
+user credentials are obtained through
+post req from login page.
+ */
 
 /*we have configured our securityconfig
- * ro secure all api on thia domAIN 
+ * to secure all api on this domain
  * EXCEPT PROVIDED URLS*/
 
 @Configuration
+@RequiredArgsConstructor
 @EnableWebSecurity
 public class SecurityConfig {
-	 @Autowired
-	    private UserDetailsService userDetailsService; 
+	 private final UserDetailsService userDetailsService;
+	 private final CustomAuthenticationSuccessHandler authenticationSuccessHandler;
+	 private final CustomAuthenticationFailureHandler authenticationFailureHandler;
 	@Bean
 	public SecurityFilterChain securityHttpConfig(HttpSecurity http) throws Exception {
 		 http
+				 .sessionManagement(smc -> smc
+						 .maximumSessions(1)
+						 .maxSessionsPreventsLogin(true)
+						 .expiredSessionStrategy(sessionInformationExpiredStrategy()))
+				.requiresChannel(rcc -> rcc.anyRequest().requiresInsecure())
 				.authorizeHttpRequests(
-						authz -> authz.
-						requestMatchers("/api/v1/public","/api/v1/users/register","/","/static/**").permitAll()
+						authz -> authz
+								.requestMatchers("/api/v1/public","/api/v1/users/register","/","/static/**","/error",
+										"/api/v1/users/login","/invalidSession","/login").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/users/register").permitAll()
 						.anyRequest().authenticated())
 				.csrf(csrf -> csrf.disable())
-				.httpBasic(Customizer.withDefaults())
+				 .formLogin(flc -> flc
+						 .loginPage("/api/v1/users/login")
+						 .usernameParameter("userid")
+						 .passwordParameter("secretPwd")
+						 .loginProcessingUrl("/login")
+						 .successHandler(authenticationSuccessHandler)
+						 .failureHandler(authenticationFailureHandler))
+				.httpBasic(hbc -> hbc.authenticationEntryPoint(new CustomBasicAuthenticationEntryPoint()))
+				.exceptionHandling(ehc -> ehc.accessDeniedHandler(new CustomAccessDeniedHandler()))
 				.logout(logout -> logout
 					    .logoutUrl("/logout")
 					    .logoutSuccessUrl("/") // or "/"
 					    .invalidateHttpSession(true)
+						.clearAuthentication(true)
 					    .deleteCookies("JSESSIONID")
 					);
 		 return http.build();
-				
-
 				//.formLogin(Customizer.withDefaults())
-
-				
-
 	}
-	 @Bean
+	/*
+	* this bean keeps track
+	* of session creation and
+	* expiration.
+	*
+	* */
+	@Bean
+	public static HttpSessionEventPublisher httpSessionEventPublisher() {
+		return new HttpSessionEventPublisher();
+	}
+	@Bean
+	public SessionInformationExpiredStrategy sessionInformationExpiredStrategy() {
+		return event -> {
+			HttpServletResponse response = event.getResponse();
+			response.sendRedirect("/api/v1/users/login?session=maxed");
+		};
+	}
+
+	/*
+	* keeps track of active session
+	* creates a new session if not available
+	* in-memory.
+	* */
+	@Bean
+	public SessionRegistry sessionRegistry() {
+		return new SessionRegistryImpl();
+	}
+/*
+* default authentication provider used
+* by spring security.
+*
+* */
+	@Bean
 	    public DaoAuthenticationProvider authenticationProvider() {
 	        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
 	        provider.setUserDetailsService(userDetailsService);
