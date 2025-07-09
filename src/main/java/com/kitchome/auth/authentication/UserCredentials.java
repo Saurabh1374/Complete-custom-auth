@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.Optional;
 
 
+import com.kitchome.auth.payload.projection.UserCredProjection;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -27,7 +28,7 @@ public class UserCredentials implements UserDetailsService {
 	@Override
 	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
 		// TODO Auto-generated method stub
-		 Optional<User> userOpt = userRepo.findByEmailIgnoreCase(username);
+		 Optional<UserCredProjection> userOpt = userRepo.findByEmailIgnoreCase(username);
 	        if (userOpt.isEmpty()) {
 	            userOpt = userRepo.findByUsernameIgnoreCase(username);
 	        }

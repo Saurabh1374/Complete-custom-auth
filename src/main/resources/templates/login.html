@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>Login</title></head>
+<body>
+<form th:action="@{/login}" method="post">
+  <input type="text" name="userid" placeholder="Username" />
+  <input type="password" name="secretPwd" placeholder="Password" />
+  <button type="submit">Login</button>
+
+  <!-- Shows on login error -->
+  <div th:if="${param.error}">Invalid username or password</div>
+
+  <!-- Shows on logout -->
+  <div th:if="${param.logout}">You have been logged out</div>
+
+
+    <div th:if="${param.session}">
+        <div class="alert alert-danger">
+            <span th:switch="${param.session}">
+                <span th:case="'maxed'">You are already logged in from another device or tab.</span>
+                <span th:case="*">unknown issue</span>
+            </span>
+        </div>
+    </div>
+
+
+</form>
+</body>
+</html>

@@ -75,4 +75,9 @@ public class UserController {
 
 		return "dashboard";
 	}
+
+	@GetMapping("/login")
+	public String loginPage() {
+		return "login"; // resolves to login.html or login.jsp based on your view setup
+	}
 }
