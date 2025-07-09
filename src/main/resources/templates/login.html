@@ -16,7 +16,7 @@
 
     <div th:if="${param.session}">
         <div class="alert alert-danger">
-            <span th:switch="${param.session}">
+            <span th:switch="${param.session[0]}">
                 <span th:case="'maxed'">You are already logged in from another device or tab.</span>
                 <span th:case="*">unknown issue</span>
             </span>
