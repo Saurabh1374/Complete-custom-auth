@@ -8,6 +8,9 @@ import com.kitchome.auth.Exception.CustomAccessDeniedHandler;
 import com.kitchome.auth.Exception.CustomBasicAuthenticationEntryPoint;
 import com.kitchome.auth.events.CustomAuthenticationFailureHandler;
 import com.kitchome.auth.events.CustomAuthenticationSuccessHandler;
+import com.kitchome.auth.filters.AuthoritiesLoggingAfterFilter;
+import com.kitchome.auth.filters.AuthoritiesLoggingAtFilter;
+import com.kitchome.auth.filters.RequestValidationBeforeFilter;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -31,12 +34,11 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.session.SessionInformationExpiredStrategy;
 
-// in the given code we are using form login which is 
-// stateful by default it will store a jsession id
-// check that in the browser cookies
+
 /*
  * here we are configuring spring security to
  * secure just the "/private" rest api
@@ -55,9 +57,13 @@ user credentials are obtained through
 post req from login page.
  */
 
-/*we have configured our securityconfig
- * to secure all api on this domain
- * EXCEPT PROVIDED URLS*/
+/*
+* we are going to implement jwt
+* and make authentication stateless
+* implementation of concurrent session
+* will be change as well as logout logic will
+* also  be changed as things are not session based now
+*/
 
 @Configuration
 @RequiredArgsConstructor
@@ -81,6 +87,9 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.POST, "/api/v1/users/register").permitAll()
 						.anyRequest().authenticated())
 				.csrf(csrf -> csrf.disable())
+				 .addFilterBefore(new RequestValidationBeforeFilter(), BasicAuthenticationFilter.class)
+				 .addFilterAfter(new AuthoritiesLoggingAfterFilter(), BasicAuthenticationFilter.class)
+				 .addFilterAt(new AuthoritiesLoggingAtFilter(), BasicAuthenticationFilter.class)
 				 .formLogin(flc -> flc
 						 .loginPage("/api/v1/users/login")
 						 .usernameParameter("userid")
