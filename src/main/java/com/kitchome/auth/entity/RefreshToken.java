@@ -17,9 +17,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class RefreshToken {
-        @Id
-        @GeneratedValue
-        @Column(columnDefinition = "uniqueidentifier", updatable = false, nullable = false)
+        @Id @GeneratedValue
         private UUID id;
 
         @ManyToOne
@@ -34,10 +32,6 @@ public class RefreshToken {
         private LocalDateTime issuedAt;
         private LocalDateTime expiresAt;
         private boolean valid = true;
-
-        @Transient
-        private String token;
-
-}
+    }
 
 
