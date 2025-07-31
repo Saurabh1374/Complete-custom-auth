@@ -1,15 +1,22 @@
 package com.kitchome.auth.entity;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kitchome.auth.util.Role;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "users")
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
 public class User {
     
     @Id
@@ -25,29 +32,11 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "role")
     private Set<Role> roles=new HashSet<>();;
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<RefreshToken> sessions;
 
-    // Constructors
-    public User() {}
-
-    public User(String username, String email, String password, Set<Role> roles) {
-        this.username = username;
-        this.email = email;
-        this.password = password;
-        this.roles = roles;
-    }
 
     // Getters and Setters
-    public Long getId() { return id; }
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
-
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-
-    public Set<Role> getRoles() { return roles; }
     @JsonProperty("roles")
     public void setRoles(Set<Role> roles) { this.roles = roles; }
     
