@@ -10,7 +10,9 @@ import com.kitchome.auth.events.CustomAuthenticationFailureHandler;
 import com.kitchome.auth.events.CustomAuthenticationSuccessHandler;
 import com.kitchome.auth.filters.AuthoritiesLoggingAfterFilter;
 import com.kitchome.auth.filters.AuthoritiesLoggingAtFilter;
+import com.kitchome.auth.filters.JwtAuthenticationFilter;
 import com.kitchome.auth.filters.RequestValidationBeforeFilter;
+import com.kitchome.auth.util.JwtUtil;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.core.userdetails.User;
@@ -34,6 +37,7 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.session.SessionInformationExpiredStrategy;
@@ -72,40 +76,23 @@ public class SecurityConfig {
 	 private final UserDetailsService userDetailsService;
 	 private final CustomAuthenticationSuccessHandler authenticationSuccessHandler;
 	 private final CustomAuthenticationFailureHandler authenticationFailureHandler;
+	private final JwtUtil jwtUtil;
 	@Bean
 	public SecurityFilterChain securityHttpConfig(HttpSecurity http) throws Exception {
 		 http
-				 .sessionManagement(smc -> smc
-						 .maximumSessions(1)
-						 .maxSessionsPreventsLogin(true)
-						 .expiredSessionStrategy(sessionInformationExpiredStrategy()))
 				.requiresChannel(rcc -> rcc.anyRequest().requiresInsecure())
+				 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(
 						authz -> authz
 								.requestMatchers("/api/v1/public","/api/v1/users/register","/","/static/**","/error",
-										"/api/v1/users/login","/invalidSession","/login").permitAll()
+										"/api/v1/users/login","/api/v1/users/refresh","/invalidSession","/login").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/users/register").permitAll()
 						.anyRequest().authenticated())
 				.csrf(csrf -> csrf.disable())
 				 .addFilterBefore(new RequestValidationBeforeFilter(), BasicAuthenticationFilter.class)
 				 .addFilterAfter(new AuthoritiesLoggingAfterFilter(), BasicAuthenticationFilter.class)
 				 .addFilterAt(new AuthoritiesLoggingAtFilter(), BasicAuthenticationFilter.class)
-				 .formLogin(flc -> flc
-						 .loginPage("/api/v1/users/login")
-						 .usernameParameter("userid")
-						 .passwordParameter("secretPwd")
-						 .loginProcessingUrl("/login")
-						 .successHandler(authenticationSuccessHandler)
-						 .failureHandler(authenticationFailureHandler))
-				.httpBasic(hbc -> hbc.authenticationEntryPoint(new CustomBasicAuthenticationEntryPoint()))
-				.exceptionHandling(ehc -> ehc.accessDeniedHandler(new CustomAccessDeniedHandler()))
-				.logout(logout -> logout
-					    .logoutUrl("/logout")
-					    .logoutSuccessUrl("/") // or "/"
-					    .invalidateHttpSession(true)
-						.clearAuthentication(true)
-					    .deleteCookies("JSESSIONID")
-					);
+				 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil,userDetailsService), UsernamePasswordAuthenticationFilter.class);
 		 return http.build();
 				//.formLogin(Customizer.withDefaults())
 	}
