@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -28,11 +27,12 @@ public class RefreshTokenService {
     @Value("${jwt.refresh-expiration-ms}")
     private long expiryDuration;
 
+    String token = UUID.randomUUID().toString();
+    String hash = DigestUtils.sha256Hex(token);
 
     public RefreshToken generateAndStoreRefreshToken(String username, String fingerprint, String ip, String ua) {
         User user = userRepo.findByUsername(username).orElseThrow();
-        String token = UUID.randomUUID().toString();
-        String hash = DigestUtils.sha256Hex(token);
+
         RefreshToken rt = new RefreshToken();
         rt.setUser(user);
         rt.setTokenHash(hash);
@@ -60,7 +60,7 @@ public class RefreshTokenService {
 
         return token;
     }
-    @Transactional
+
     public void invalidate(RefreshToken token) {
         token.setValid(false);
         tokenRepo.save(token);

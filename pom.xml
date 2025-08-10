@@ -103,7 +103,13 @@
 			<artifactId>mssql-jdbc</artifactId>
 			<version>12.4.2.jre11</version> <!-- Or use jre17 if you're using Java 17 -->
 		</dependency>
-<!-- jwt dependency-->
+		<dependency>
+			<groupId>commons-codec</groupId>
+			<artifactId>commons-codec</artifactId>
+			<!-- Or latest stable version -->
+		</dependency>
+
+		<!-- jwt dependency-->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>

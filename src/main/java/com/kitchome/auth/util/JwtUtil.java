@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.security.Key;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -18,10 +19,10 @@ import java.util.function.Function;
 public class JwtUtil {
     @Value("${jwt.secret}")
     private String SECRET;
-    @Value("${jwt.expiration-ms")
+    @Value("${jwt.expiration-ms}")
     private long expieryDuration;
 
-    public String extractUsernane(String token){
+    public String extractUsername(String token){
         return extractClaims(token,Claims::getSubject);
     }
 
@@ -36,8 +37,8 @@ public class JwtUtil {
         return extractExpiration(token).before(new Date());
     }
     public boolean isValid(String token, UserDetails user){
-        String userName=extractUsernane(token);
-        return user.getUsername().equals(extractUsernane(token)) && !isExpired(token);
+        String userName=extractUsername(token);
+        return user.getUsername().equals(extractUsername(token)) && !isExpired(token);
 
     }
 
@@ -49,7 +50,7 @@ public class JwtUtil {
                 .parseClaimsJws(token)
                 .getBody();
     }
-    private String createToken(Map<String,String> claims,String username){
+    private String createToken(Map<String,Object> claims,String username){
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(username)
@@ -57,7 +58,13 @@ public class JwtUtil {
                 .setExpiration(new Date(System.currentTimeMillis()+expieryDuration))
                 .signWith(getSigningkey(), SignatureAlgorithm.HS256).compact();
     }
-    public String generateToken
+    public String generateToken(String username){
+        Map<String, Object> claims = new HashMap<>();
+        return createToken(claims, username);
+    }
+    public String GenerateTokenWithClaims(Map<String,Object> claims,String username){
+        return createToken(claims, username);
+    }
     private Key getSigningkey(){
         byte[] keyBytes= Decoders.BASE64.decode(SECRET);
         return Keys.hmacShaKeyFor(keyBytes);
