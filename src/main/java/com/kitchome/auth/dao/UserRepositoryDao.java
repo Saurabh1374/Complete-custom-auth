@@ -14,4 +14,5 @@ public interface UserRepositoryDao extends JpaRepository<User, Long>{
 	Optional<UserCredProjection> findByEmailIgnoreCase(String email);
 	Optional<UserCredProjection> findByUsernameIgnoreCase(String username);
 
+	Optional<User> findByUsername(String username);
 }
