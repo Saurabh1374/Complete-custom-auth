@@ -8,10 +8,7 @@ import com.kitchome.auth.Exception.CustomAccessDeniedHandler;
 import com.kitchome.auth.Exception.CustomBasicAuthenticationEntryPoint;
 import com.kitchome.auth.events.CustomAuthenticationFailureHandler;
 import com.kitchome.auth.events.CustomAuthenticationSuccessHandler;
-import com.kitchome.auth.filters.AuthoritiesLoggingAfterFilter;
-import com.kitchome.auth.filters.AuthoritiesLoggingAtFilter;
-import com.kitchome.auth.filters.JwtAuthenticationFilter;
-import com.kitchome.auth.filters.RequestValidationBeforeFilter;
+import com.kitchome.auth.filters.*;
 import com.kitchome.auth.util.JwtUtil;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
@@ -92,7 +89,8 @@ public class SecurityConfig {
 				 .addFilterBefore(new RequestValidationBeforeFilter(), BasicAuthenticationFilter.class)
 				 .addFilterAfter(new AuthoritiesLoggingAfterFilter(), BasicAuthenticationFilter.class)
 				 .addFilterAt(new AuthoritiesLoggingAtFilter(), BasicAuthenticationFilter.class)
-				 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil,userDetailsService), UsernamePasswordAuthenticationFilter.class);
+				 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil,userDetailsService), UsernamePasswordAuthenticationFilter.class)
+				 .addFilterAfter(new AlreadyLoggedInFilter(authenticationSuccessHandler),JwtAuthenticationFilter.class);
 		 return http.build();
 				//.formLogin(Customizer.withDefaults())
 	}
