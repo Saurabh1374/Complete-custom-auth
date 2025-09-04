@@ -42,7 +42,6 @@ jobs:
         uses: githubocto/repo-visualizer@main
         with:
           output_file: repo-diagram.svg
-          artifact_name: repo-diagram
 
       # ✅ Commit and push diagram
       - name: Commit and push diagram
