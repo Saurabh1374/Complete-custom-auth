@@ -8,17 +8,23 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.kitchome.auth.Exception.AuthException;
 import com.kitchome.auth.authentication.CustomUserDetails;
+import com.kitchome.auth.authentication.UserCredentials;
 import com.kitchome.auth.entity.RefreshToken;
 import com.kitchome.auth.entity.User;
 import com.kitchome.auth.payload.*;
 import com.kitchome.auth.payload.projection.UserCredProjection;
 import com.kitchome.auth.service.RefreshTokenService;
+import com.kitchome.auth.util.ErrorCode;
 import com.kitchome.auth.util.JwtUtil;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import jdk.jfr.ContentType;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -31,6 +37,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.ott.RedirectOneTimeTokenGenerationSuccessHandler;
 import org.springframework.stereotype.Controller;
@@ -42,22 +49,21 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 import com.kitchome.auth.Exception.ValidationException;
 import com.kitchome.auth.service.UserService;
-import com.kitchome.auth.util.Validation;
 
+
+@Slf4j
 @Controller
 @RequestMapping("api/v1/users")
 public class UserController {
-	private final UserService userService;
-	private final Validation validation;
+	private final UserCredentials userService;
 	private final AuthenticationManager authenticationManager;
 	private final JwtUtil jwtUtil;
 	private final RefreshTokenService refreshTokenService;
 	private final AuthenticationSuccessHandler successHandler;
 
-	public UserController(UserService userService, Validation validation, AuthenticationManager authenticationManager, JwtUtil jwtUtil, RefreshTokenService refreshTokenService, AuthenticationSuccessHandler successHandler) {
+	public UserController(UserCredentials userService,  AuthenticationManager authenticationManager, JwtUtil jwtUtil, RefreshTokenService refreshTokenService, AuthenticationSuccessHandler successHandler) {
 		super();
 		this.userService = userService;
-		this.validation =validation;
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.refreshTokenService = refreshTokenService;
@@ -69,20 +75,29 @@ public class UserController {
 	        return "register"; // This will look for register.html in resources/templates
 	    }
 	@PostMapping("/register")
-	public ResponseEntity<?> createUser(@RequestBody RegisterUserDTO userDto) {
-		ValidationResult valid=validation.userAlreadyExists(userDto.getEmail());
-		if(!valid.isvalid()) {
-			throw new ValidationException(valid.getValidationError(),"Email is already registered ");
+	public ResponseEntity<?> createUser(@RequestBody @Valid RegisterUserDTO userDto) {
+		try {
+			userService.registerUser(userDto);
+			return ResponseEntity
+					.status(HttpStatus.CREATED)
+					.body("User registered successfully");
+		}catch(Exception ve){
+			throw new AuthException(ErrorCode.USER_ALREADY_AVAILABLE,ve.getMessage());
 		}
-		userService.registerUser(userDto);
-		 return ResponseEntity
-	                .status(HttpStatus.CREATED)
-	                .body("User registered successfully");
 	}
 	@PostMapping("/login")
-	public ResponseEntity<JwtResponseDTO> login(@RequestBody AuthRequestDTO request,
-												HttpServletRequest httpRequest, HttpServletResponse response) {
 
+	public ResponseEntity<?> login(@RequestBody AuthRequestDTO request,
+												HttpServletRequest httpRequest, HttpServletResponse response) {
+		String rawToken = Arrays.stream(Optional.ofNullable(httpRequest.getCookies()).orElse(new Cookie[0]))
+				.filter(c -> "refreshToken".equals(c.getName()))
+				.map(Cookie::getValue)
+				.findFirst()
+				.orElse("NA");
+		if(!"NA".equals(rawToken)) {
+			log.info("validation failed in api---------at controller");
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("contains refresh token");
+		}
 		// 1. Authenticate user
 		Authentication authentication = authenticationManager.authenticate(
 				new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
@@ -135,37 +150,42 @@ GET params can leak in logs, browser history, referrers if you ever put tokens i
 Even though here you’re using cookies/localStorage, attackers may exploit the assumption that GET = cacheable.*/
 	@PostMapping("/refresh")
 	public ResponseEntity<JwtResponseDTO> refreshToken(HttpServletRequest httpRequest,HttpServletResponse response) {
-		String rawToken = Arrays.stream(Optional.ofNullable(httpRequest.getCookies()).orElse(new Cookie[0]))
-				.filter(c -> "refreshToken".equals(c.getName()))
-				.map(Cookie::getValue)
-				.findFirst()
-				.orElseThrow(() -> new SecurityException("Missing refresh token cookie"));
-		String fingerprint = getFingerprint(httpRequest);
-		String ip = httpRequest.getRemoteAddr();
+		try {
+			String rawToken = Arrays.stream(Optional.ofNullable(httpRequest.getCookies()).orElse(new Cookie[0]))
+					.filter(c -> "refreshToken".equals(c.getName()))
+					.map(Cookie::getValue)
+					.findFirst()
+					.orElseThrow(() -> new AuthException(ErrorCode.TOKEN_NOT_FOUND));
+			String fingerprint = getFingerprint(httpRequest);
+			String ip = httpRequest.getRemoteAddr();
 
-		RefreshToken token = refreshTokenService.validate(rawToken);
+			RefreshToken token = refreshTokenService.validate(rawToken);
 
-		// Optional: verify fingerprint/ip/userAgent matches
-		if (!token.getFingerprint().equals(fingerprint) || !token.getIp().equals(ip)) {
-			throw new SecurityException("Device mismatch or suspicious activity");
+			// Optional: verify fingerprint/ip/userAgent matches
+			if (!token.getFingerprint().equals(fingerprint) || !token.getIp().equals(ip)) {
+				throw new AuthException(ErrorCode.SUSPESIOUS);
+			}
+
+			refreshTokenService.invalidate(token); // rotation
+
+			User user = token.getUser();
+			String newAccessToken = jwtUtil.generateToken(user.getUsername());
+			RefreshToken newRefresh = refreshTokenService
+					.generateAndStoreRefreshToken(user.getUsername(), fingerprint, ip, httpRequest.getHeader("User-Agent"));
+			HttpHeaders headers = new HttpHeaders();
+			headers.add(HttpHeaders.AUTHORIZATION, "Bearer " + newAccessToken);
+			Cookie refreshCookie = new Cookie("refreshToken", newRefresh.getToken());
+			refreshCookie.setHttpOnly(true);
+			refreshCookie.setSecure(false);
+			refreshCookie.setPath("/");
+			refreshCookie.setMaxAge(15 * 24 * 60 * 60);
+			response.addCookie(refreshCookie);
+
+			return ResponseEntity.status(HttpStatus.OK).headers(headers).body(new JwtResponseDTO(newAccessToken, newRefresh.getToken()));
+		}catch(AuthException ae){
+			log.error("Failed request",ae);
+			throw new AuthException(ErrorCode.INTERNAL_SERVER_ERROR,ae);
 		}
-
-		refreshTokenService.invalidate(token); // rotation
-
-		User user = token.getUser();
-		String newAccessToken = jwtUtil.generateToken(user.getUsername());
-		RefreshToken newRefresh = refreshTokenService
-				.generateAndStoreRefreshToken(user.getUsername(), fingerprint, ip, httpRequest.getHeader("User-Agent"));
-		HttpHeaders headers = new HttpHeaders();
-		headers.add(HttpHeaders.AUTHORIZATION, "Bearer " + newAccessToken);
-		Cookie refreshCookie = new Cookie("refreshToken", newRefresh.getToken());
-		refreshCookie.setHttpOnly(true);
-		refreshCookie.setSecure(false);
-		refreshCookie.setPath("/");
-		refreshCookie.setMaxAge(15 * 24 * 60 * 60);
-		response.addCookie(refreshCookie);
-
-		return ResponseEntity.ok(new JwtResponseDTO(newAccessToken, newRefresh.getToken()));
 	}
 
 	@GetMapping("/dashboard")

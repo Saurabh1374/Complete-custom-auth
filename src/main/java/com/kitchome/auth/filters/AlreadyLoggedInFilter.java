@@ -14,11 +14,7 @@ import java.io.IOException;
 @Slf4j
 public class AlreadyLoggedInFilter extends OncePerRequestFilter {
 
-    private final AuthenticationSuccessHandler successHandler;
-
-    // inject your custom success handler
-    public AlreadyLoggedInFilter(AuthenticationSuccessHandler successHandler) {
-        this.successHandler = successHandler;
+    public AlreadyLoggedInFilter() {
     }
 
     @Override
@@ -31,10 +27,12 @@ public class AlreadyLoggedInFilter extends OncePerRequestFilter {
             if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
                 log.info("already logged in");
                 // ✅ Already authenticated → delegate to success handler
-                successHandler.onAuthenticationSuccess(request, response, auth);
+                log.info("call from filter");
                 return;
             }
         }
         filterChain.doFilter(request, response);
     }
+
+
 }

@@ -20,9 +20,15 @@ public class ValidationException extends BaseException{
 	public ValidationException(List<ValidationError> error, String message) {
 		super(ErrorCode.VALIDATION_ERROR,message);
 		this.error = error;
+		this.message=message;
 	}
 	
 	public List<ValidationError> getError() {
 		return error;
+	}
+
+	@Override
+	public String getMessage() {
+		return message;
 	}
 }
