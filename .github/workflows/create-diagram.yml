@@ -40,3 +40,11 @@ jobs:
         with:
           output_file: repo-diagram.svg
           artifact_name: repo-diagram
+
+      - name: Commit and push diagram
+        run: |
+              git config --global user.name "github-actions[bot]"
+              git config --global user.email "github-actions[bot]@users.noreply.github.com"
+              git add repo-diagram.svg
+              git commit -m "Repo visualizer: update diagram" || echo "No changes to commit"
+              git push
