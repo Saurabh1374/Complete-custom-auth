@@ -1,0 +1,42 @@
+name: Create Repo Diagram
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ✅ Checkout source code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ✅ Set up JDK 17 (for Spring Boot/Maven builds)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # ✅ Build with Maven (skip tests)
+      - name: Build with Maven (skip tests)
+        run: mvn clean install -DskipTests
+
+  visualize:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ✅ Repo visualizer action
+      - name: Generate repository diagram
+        uses: githubocto/repo-visualizer@main
+        with:
+          output_file: repo-diagram.svg
+          artifact_name: repo-diagram
