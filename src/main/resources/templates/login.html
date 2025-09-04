@@ -91,19 +91,23 @@
     });
 
     function loadDashboard() {
+    const token = localStorage.getItem("accessToken");
         $.ajax({
             url: "/api/v1/users/dashboard",
+             headers: {
+            "Authorization": "Bearer " + token
+        },
             method: "GET",
             success: function (data) {
                 console.log("Dashboard data:", data);
                 // ✅ Redirect AFTER confirming token works
-                window.location.href = "/api/v1/users/dashboard";
+                //window.location.href = "/api/v1/users/dashboard";
             },
             error: function (xhr) {
                 if (xhr.status === 403 || xhr.status === 401) {
                     alert("Not authorized. Please log in again.");
                     localStorage.clear();
-                    window.location.href = "/login";
+                    window.location.href = "api/v1/users/login";
                 }
             }
         });
