@@ -4,21 +4,16 @@ package com.kitchome.auth.authentication;
  * Date: 3-03-2025
  * */
 
-import com.kitchome.auth.Exception.CustomAccessDeniedHandler;
-import com.kitchome.auth.Exception.CustomBasicAuthenticationEntryPoint;
-import com.kitchome.auth.events.CustomAuthenticationFailureHandler;
-import com.kitchome.auth.events.CustomAuthenticationSuccessHandler;
-import com.kitchome.auth.filters.AuthoritiesLoggingAfterFilter;
-import com.kitchome.auth.filters.AuthoritiesLoggingAtFilter;
-import com.kitchome.auth.filters.JwtAuthenticationFilter;
-import com.kitchome.auth.filters.RequestValidationBeforeFilter;
+import com.kitchome.auth.filters.*;
 import com.kitchome.auth.util.JwtUtil;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.repository.cdi.Eager;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -36,7 +31,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
@@ -74,9 +71,10 @@ post req from login page.
 @EnableWebSecurity
 public class SecurityConfig {
 	 private final UserDetailsService userDetailsService;
-	 private final CustomAuthenticationSuccessHandler authenticationSuccessHandler;
-	 private final CustomAuthenticationFailureHandler authenticationFailureHandler;
 	private final JwtUtil jwtUtil;
+	private final AccessDeniedHandler customAccessDeniedHandler;
+	private final AuthenticationEntryPoint authenticationEntryPoint;
+	private final PasswordEncoder passwordEncoder;
 	@Bean
 	public SecurityFilterChain securityHttpConfig(HttpSecurity http) throws Exception {
 		 http
@@ -87,12 +85,19 @@ public class SecurityConfig {
 								.requestMatchers("/api/v1/public","/api/v1/users/register","/","/static/**","/error",
 										"/api/v1/users/login","/api/v1/users/refresh","/invalidSession","/login").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/users/register").permitAll()
+								.requestMatchers(HttpMethod.POST, "/api/v1/users/refresh").permitAll()
 						.anyRequest().authenticated())
 				.csrf(csrf -> csrf.disable())
+				 .cors(Customizer.withDefaults())
 				 .addFilterBefore(new RequestValidationBeforeFilter(), BasicAuthenticationFilter.class)
 				 .addFilterAfter(new AuthoritiesLoggingAfterFilter(), BasicAuthenticationFilter.class)
 				 .addFilterAt(new AuthoritiesLoggingAtFilter(), BasicAuthenticationFilter.class)
-				 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil,userDetailsService), UsernamePasswordAuthenticationFilter.class);
+				 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil,userDetailsService,authenticationEntryPoint), UsernamePasswordAuthenticationFilter.class)
+				 .addFilterAfter(new AlreadyLoggedInFilter(),JwtAuthenticationFilter.class)
+				 .exceptionHandling(ex -> ex
+						 .accessDeniedHandler(customAccessDeniedHandler)
+						 .authenticationEntryPoint(authenticationEntryPoint)// 403
+				 );
 		 return http.build();
 				//.formLogin(Customizer.withDefaults())
 	}
@@ -132,7 +137,7 @@ public class SecurityConfig {
 	    public DaoAuthenticationProvider authenticationProvider() {
 	        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
 	        provider.setUserDetailsService(userDetailsService);
-	        provider.setPasswordEncoder(pass());
+	        provider.setPasswordEncoder(passwordEncoder);
 	        return provider;
 	    }
 
@@ -156,9 +161,6 @@ public class SecurityConfig {
 	 * it is reccomended to use password encoder factory it provides backward
 	 * compatiblity
 	 */
-	@Bean
-	public PasswordEncoder pass() {
-		return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-	}
+
 
 }
